@@ -187,11 +187,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
         <div
           style={{
             position: 'absolute',
-            top: '56%',
+            top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '220px',
-            height: '220px',
+            width: '72%',
+            maxWidth: '320px',
+            height: '180px',
             pointerEvents: 'none',
             border: '2px solid rgba(99, 102, 241, 0.9)',
             borderRadius: '14px',
@@ -200,10 +201,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
             boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.2)'
           }}
         >
-          <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: 22, borderTop: '4px solid #8b5cf6', borderLeft: '4px solid #8b5cf6', borderTopLeftRadius: 8 }} />
-          <div style={{ position: 'absolute', top: 0, right: 0, width: 22, height: 22, borderTop: '4px solid #8b5cf6', borderRight: '4px solid #8b5cf6', borderTopRightRadius: 8 }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, width: 22, height: 22, borderBottom: '4px solid #8b5cf6', borderLeft: '4px solid #8b5cf6', borderBottomLeftRadius: 8 }} />
-          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderBottom: '4px solid #8b5cf6', borderRight: '4px solid #8b5cf6', borderBottomRightRadius: 8 }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: 22, borderTop: '4px solid #8b5cf6', borderLeft: '4px solid #8b5cf6', borderTopLeftRadius: 6 }} />
+          <div style={{ position: 'absolute', top: 0, right: 0, width: 22, height: 22, borderTop: '4px solid #8b5cf6', borderRight: '4px solid #8b5cf6', borderTopRightRadius: 6 }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, width: 22, height: 22, borderBottom: '4px solid #8b5cf6', borderLeft: '4px solid #8b5cf6', borderBottomLeftRadius: 6 }} />
+          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderBottom: '4px solid #8b5cf6', borderRight: '4px solid #8b5cf6', borderBottomRightRadius: 6 }} />
           <div className="laser-line" />
         </div>
       )}
