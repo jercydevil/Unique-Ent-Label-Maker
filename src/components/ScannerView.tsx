@@ -136,8 +136,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
         margin: '0 auto',
         borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
-        background: '#000',
-        boxShadow: 'var(--shadow-lg)'
+        background: 'linear-gradient(180deg, #050b13 0%, #02060d 100%)',
+        boxShadow: '0 0 0 1px rgba(99, 102, 241, 0.35), 0 18px 38px rgba(0, 0, 0, 0.45)',
+        border: '1px solid rgba(99, 102, 241, 0.28)'
       }}
     >
       {/* Top Controls Overlay */}
@@ -221,7 +222,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
           width: '100%',
           minHeight: '340px',
           background: '#000',
-          position: 'relative'
+          position: 'relative',
+          border: '3px solid rgba(99, 102, 241, 0.8)',
+          borderRadius: '18px',
+          margin: '8px',
+          overflow: 'hidden',
+          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 0 1px rgba(99,102,241,0.35), 0 0 28px rgba(99,102,241,0.18)'
         }}
       />
 
@@ -236,10 +242,11 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
             width: '240px',
             height: '240px',
             pointerEvents: 'none',
-            border: '2px solid rgba(255, 255, 255, 0.2)',
+            border: '2px solid rgba(99, 102, 241, 0.9)',
             borderRadius: '16px',
             zIndex: 10,
-            overflow: 'hidden'
+            overflow: 'hidden',
+            boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.25), 0 0 24px rgba(99, 102, 241, 0.35)'
           }}
         >
           {/* Viewfinder Corners */}

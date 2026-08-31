@@ -238,40 +238,56 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
           STEP 1: SCAN QR CODE
           ------------------------------------------------------------- */}
       {step === 'scan' && (
-        <div>
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <span className="badge badge-production" style={{ background: 'rgba(99,102,241,0.2)' }}>
-                TAP 1 OF 3
-              </span>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 700 }}>
-                SCAN PRODUCT LABEL
-              </span>
-            </div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Scan Label to Deliver</h2>
-          </div>
+        <div style={{ maxWidth: '640px', margin: '0 auto', padding: '0 16px 24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <ScannerView onScanSuccess={handleCodeScanned} />
 
-          {labelError && (
             <div
               style={{
-                background: 'var(--danger-bg)',
-                border: '1px solid var(--danger)',
-                borderRadius: 'var(--radius-md)',
-                padding: '14px',
-                marginBottom: '16px',
-                color: '#fca5a5',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
+                position: 'sticky',
+                top: '96px',
+                zIndex: 20,
+                background: 'linear-gradient(180deg, rgba(10,15,29,0.98) 0%, rgba(10,15,29,0.9) 100%)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                paddingTop: '8px',
+                paddingBottom: '12px',
+                borderBottom: '1px solid rgba(99,102,241,0.35)',
+                boxShadow: '0 10px 18px rgba(0,0,0,0.18)'
               }}
             >
-              <AlertOctagon size={20} />
-              <span>{labelError}</span>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <span className="badge badge-production" style={{ background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', fontSize: '0.72rem', padding: '5px 10px' }}>
+                    TAP 1 OF 3
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 800, letterSpacing: '0.08em' }}>
+                    SCAN PRODUCT LABEL
+                  </span>
+                </div>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.2, margin: 0 }}>Scan Label to Deliver</h2>
+              </div>
             </div>
-          )}
 
-          <ScannerView onScanSuccess={handleCodeScanned} />
+            {labelError && (
+              <div
+                style={{
+                  background: 'var(--danger-bg)',
+                  border: '1px solid var(--danger)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '14px',
+                  color: '#fca5a5',
+                  fontSize: '0.9rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}
+              >
+                <AlertOctagon size={20} />
+                <span>{labelError}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
