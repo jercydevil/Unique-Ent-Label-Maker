@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, Flashlight, RefreshCcw, Keyboard, ArrowRight, X, AlertTriangle } from 'lucide-react';
+import { Camera, ArrowRight, AlertTriangle } from 'lucide-react';
 
 interface ScannerViewProps {
   onScanSuccess: (code: string) => void;
@@ -16,7 +16,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
   const [isScanning, setIsScanning] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
-  const [isManualOpen, setIsManualOpen] = useState(false);
 
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'qr-reader-container';
@@ -69,7 +68,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
 
         if (mounted) {
           setIsScanning(true);
-          // Check for torch capability
           try {
             const capabilities = (html5QrCode as any).getRunningTrackCapabilities();
             if (capabilities && (capabilities as any).torch) {
@@ -83,7 +81,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
         if (mounted) {
           console.warn('Camera start error:', err);
           setCameraError('Camera access denied or unavailable. You can type the 8-character code below.');
-          setIsManualOpen(true);
         }
       }
     };
@@ -132,159 +129,113 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
       style={{
         position: 'relative',
         width: '100%',
-        maxWidth: '480px',
+        maxWidth: '560px',
         margin: '0 auto',
-        borderRadius: 'var(--radius-lg)',
+        borderRadius: '12px',
         overflow: 'hidden',
-        background: 'linear-gradient(180deg, #050b13 0%, #02060d 100%)',
-        boxShadow: '0 0 0 1px rgba(99, 102, 241, 0.35), 0 18px 38px rgba(0, 0, 0, 0.45)',
-        border: '1px solid rgba(99, 102, 241, 0.28)'
+        background: 'rgba(10, 15, 29, 0.25)',
+        border: '1px solid rgba(99, 102, 241, 0.45)',
+        boxShadow: 'none'
       }}
     >
-      {/* Top Controls Overlay */}
       <div
         style={{
-          position: 'absolute',
-          top: 14,
-          left: 14,
-          right: 14,
-          zIndex: 20,
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: '10px',
+          color: '#e2e8f0',
+          fontWeight: 800,
+          fontSize: '1.05rem',
+          padding: '12px 16px 10px',
+          background: 'transparent'
         }}
       >
         <div
           style={{
-            background: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: '20px',
-            padding: '6px 14px',
-            fontSize: '0.8rem',
-            fontWeight: 700,
-            color: '#fff',
+            width: '20px',
+            height: '20px',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            justifyContent: 'center',
+            borderRadius: '6px',
+            border: '1px solid rgba(139, 92, 246, 0.9)',
+            color: '#a78bfa',
+            background: 'rgba(139, 92, 246, 0.08)'
           }}
         >
-          <Camera size={14} color="#38bdf8" />
-          <span>Point camera at QR code</span>
+          <Camera size={12} />
         </div>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {hasTorch && (
-            <button
-              onClick={toggleTorch}
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                background: torchOn ? '#eab308' : 'rgba(0, 0, 0, 0.65)',
-                color: torchOn ? '#000' : '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Flashlight size={18} />
-            </button>
-          )}
-
-          {onCancel && (
-            <button
-              onClick={onCancel}
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                background: 'rgba(0, 0, 0, 0.65)',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <X size={20} />
-            </button>
-          )}
-        </div>
+        <span>Point camera at QR code</span>
       </div>
 
-      {/* HTML5 QR Camera Element */}
       <div
         id={scannerContainerId}
         style={{
           width: '100%',
-          minHeight: '340px',
+          height: '220px',
           background: '#000',
           position: 'relative',
-          border: '3px solid rgba(99, 102, 241, 0.8)',
-          borderRadius: '18px',
-          margin: '8px',
+          border: '2px solid rgba(99, 102, 241, 0.7)',
+          borderRadius: '12px',
+          margin: '0 8px',
           overflow: 'hidden',
-          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 0 1px rgba(99,102,241,0.35), 0 0 28px rgba(99,102,241,0.18)'
+          boxShadow: 'none'
         }}
       />
 
-      {/* Laser Scanning Animation Overlay */}
       {isScanning && (
         <div
           style={{
             position: 'absolute',
-            top: '50%',
+            top: '56%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '240px',
-            height: '240px',
+            width: '220px',
+            height: '220px',
             pointerEvents: 'none',
             border: '2px solid rgba(99, 102, 241, 0.9)',
-            borderRadius: '16px',
+            borderRadius: '14px',
             zIndex: 10,
             overflow: 'hidden',
-            boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.25), 0 0 24px rgba(99, 102, 241, 0.35)'
+            boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.2)'
           }}
         >
-          {/* Viewfinder Corners */}
-          <div style={{ position: 'absolute', top: 0, left: 0, width: 24, height: 24, borderTop: '4px solid #6366f1', borderLeft: '4px solid #6366f1', borderTopLeftRadius: 8 }} />
-          <div style={{ position: 'absolute', top: 0, right: 0, width: 24, height: 24, borderTop: '4px solid #6366f1', borderRight: '4px solid #6366f1', borderTopRightRadius: 8 }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, width: 24, height: 24, borderBottom: '4px solid #6366f1', borderLeft: '4px solid #6366f1', borderBottomLeftRadius: 8 }} />
-          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderBottom: '4px solid #6366f1', borderRight: '4px solid #6366f1', borderBottomRightRadius: 8 }} />
-
-          {/* Sweeping Laser Line */}
+          <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: 22, borderTop: '4px solid #8b5cf6', borderLeft: '4px solid #8b5cf6', borderTopLeftRadius: 8 }} />
+          <div style={{ position: 'absolute', top: 0, right: 0, width: 22, height: 22, borderTop: '4px solid #8b5cf6', borderRight: '4px solid #8b5cf6', borderTopRightRadius: 8 }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, width: 22, height: 22, borderBottom: '4px solid #8b5cf6', borderLeft: '4px solid #8b5cf6', borderBottomLeftRadius: 8 }} />
+          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderBottom: '4px solid #8b5cf6', borderRight: '4px solid #8b5cf6', borderBottomRightRadius: 8 }} />
           <div className="laser-line" />
         </div>
       )}
 
-      {/* Camera Error / Manual Fallback Prompt */}
       {cameraError && (
         <div
           style={{
-            padding: '20px',
+            margin: '12px 8px 0',
+            padding: '14px 12px',
             background: 'rgba(239, 68, 68, 0.12)',
-            borderTop: '1px solid rgba(239, 68, 68, 0.3)',
-            color: '#fca5a5',
+            border: '1px solid rgba(239, 68, 68, 0.5)',
+            borderRadius: '12px',
+            color: '#fda4af',
             fontSize: '0.85rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px'
+            gap: '10px',
+            fontWeight: 800,
+            lineHeight: 1.4
           }}
         >
-          <AlertTriangle size={20} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(239,68,68,0.18)' }}>
+            <AlertTriangle size={16} />
+          </div>
           <span>{cameraError}</span>
         </div>
       )}
 
-      {/* Bottom Manual Entry Drawer */}
       <div
         style={{
-          background: '#111827',
-          padding: '16px 20px',
-          borderTop: '1px solid var(--border-subtle)'
+          background: 'transparent',
+          padding: '12px 10px 14px'
         }}
       >
         <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '10px' }}>
@@ -298,14 +249,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
               autoCapitalize="none"
               style={{
                 width: '100%',
-                background: 'rgba(255, 255, 255, 0.06)',
+                background: 'rgba(255, 255, 255, 0.04)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: 'var(--radius-md)',
+                borderRadius: '12px',
                 padding: '12px 14px',
                 color: '#fff',
                 fontFamily: 'var(--font-mono)',
                 fontSize: '1rem',
-                letterSpacing: '0.1em'
+                letterSpacing: '0.08em'
               }}
             />
           </div>
@@ -314,9 +265,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
             disabled={!manualCode.trim()}
             className="btn-primary"
             style={{
-              padding: '12px 18px',
-              borderRadius: 'var(--radius-md)',
-              opacity: manualCode.trim() ? 1 : 0.6
+              padding: '12px 16px',
+              borderRadius: '12px',
+              opacity: manualCode.trim() ? 1 : 0.6,
+              minWidth: '110px'
             }}
           >
             <span>Proceed</span>

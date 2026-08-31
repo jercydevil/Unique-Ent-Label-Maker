@@ -16,7 +16,11 @@ import {
   ArrowRight,
   ShieldCheck,
   Flame,
-  Truck
+  Truck,
+  Printer,
+  History,
+  Layers,
+  Users
 } from 'lucide-react';
 import { ScannerView } from './ScannerView';
 import { callRpc, type Client, type LabelDetails } from '../lib/supabase';
@@ -27,9 +31,11 @@ import { useMode } from '../context/ModeContext';
 interface DeliveryWorkflowProps {
   initialCode?: string | null;
   onClearInitialCode?: () => void;
+  activeTab?: 'scan' | 'labels' | 'ledger' | 'batches' | 'staff';
+  setActiveTab?: (tab: 'scan' | 'labels' | 'ledger' | 'batches' | 'staff') => void;
 }
 
-export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode, onClearInitialCode }) => {
+export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode, onClearInitialCode, activeTab, setActiveTab }) => {
   const { user } = useAuth();
   const { isSandbox, setSandbox } = useMode();
 
@@ -239,34 +245,72 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
           ------------------------------------------------------------- */}
       {step === 'scan' && (
         <div style={{ maxWidth: '640px', margin: '0 auto', padding: '0 16px 24px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <ScannerView onScanSuccess={handleCodeScanned} />
 
-            <div
-              style={{
-                position: 'sticky',
-                top: '96px',
-                zIndex: 20,
-                background: 'linear-gradient(180deg, rgba(10,15,29,0.98) 0%, rgba(10,15,29,0.9) 100%)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                paddingTop: '8px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid rgba(99,102,241,0.35)',
-                boxShadow: '0 10px 18px rgba(0,0,0,0.18)'
-              }}
-            >
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <span className="badge badge-production" style={{ background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', fontSize: '0.72rem', padding: '5px 10px' }}>
-                    TAP 1 OF 3
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 800, letterSpacing: '0.08em' }}>
-                    SCAN PRODUCT LABEL
-                  </span>
-                </div>
-                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.2, margin: 0 }}>Scan Label to Deliver</h2>
+            {setActiveTab && (
+              <nav style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', padding: '4px 0', marginTop: '2px' }}>
+                <button
+                  onClick={() => setActiveTab('scan')}
+                  className={activeTab === 'scan' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                >
+                  <QrCode size={18} />
+                  <span>Scan & Deliver</span>
+                </button>
+
+                {user?.role === 'admin' && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('labels')}
+                      className={activeTab === 'labels' ? 'btn-primary' : 'btn-secondary'}
+                      style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                    >
+                      <Printer size={18} />
+                      <span>Print Labels</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('ledger')}
+                      className={activeTab === 'ledger' ? 'btn-primary' : 'btn-secondary'}
+                      style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                    >
+                      <History size={18} />
+                      <span>Sales Ledger</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('batches')}
+                      className={activeTab === 'batches' ? 'btn-primary' : 'btn-secondary'}
+                      style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                    >
+                      <Layers size={18} />
+                      <span>Batches</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('staff')}
+                      className={activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}
+                      style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                    >
+                      <Users size={18} />
+                      <span>Staff</span>
+                    </button>
+                  </>
+                )}
+              </nav>
+            )}
+
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <span className="badge badge-production" style={{ background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', fontSize: '0.72rem', padding: '5px 10px' }}>
+                  TAP 1 OF 3
+                </span>
+                <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 800, letterSpacing: '0.08em' }}>
+                  SCAN PRODUCT LABEL
+                </span>
               </div>
+              <h2 style={{ fontSize: '1.9rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.1, margin: 0 }}>Scan Label to Deliver</h2>
             </div>
 
             {labelError && (

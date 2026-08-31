@@ -20,9 +20,10 @@ export type ActiveTab = 'scan' | 'labels' | 'ledger' | 'batches' | 'staff';
 interface NavbarProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
+  showTabs?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, showTabs = true }) => {
   const { user, logout } = useAuth();
   const { isSandbox, toggleSandbox } = useMode();
 
@@ -91,58 +92,60 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         </div>
 
         {/* Navigation Tabs */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', padding: '4px 0' }}>
-          {/* Scan Tab - Available for Staff & Admin */}
-          <button
-            onClick={() => setActiveTab('scan')}
-            className={activeTab === 'scan' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
-          >
-            <QrCode size={18} />
-            <span>Scan & Deliver</span>
-          </button>
+        {showTabs && (
+          <nav style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', padding: '4px 0' }}>
+            {/* Scan Tab - Available for Staff & Admin */}
+            <button
+              onClick={() => setActiveTab('scan')}
+              className={activeTab === 'scan' ? 'btn-primary' : 'btn-secondary'}
+              style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+            >
+              <QrCode size={18} />
+              <span>Scan & Deliver</span>
+            </button>
 
-          {/* Admin Tabs */}
-          {user?.role === 'admin' && (
-            <>
-              <button
-                onClick={() => setActiveTab('labels')}
-                className={activeTab === 'labels' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
-              >
-                <Printer size={18} />
-                <span>Print Labels</span>
-              </button>
+            {/* Admin Tabs */}
+            {user?.role === 'admin' && (
+              <>
+                <button
+                  onClick={() => setActiveTab('labels')}
+                  className={activeTab === 'labels' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                >
+                  <Printer size={18} />
+                  <span>Print Labels</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('ledger')}
-                className={activeTab === 'ledger' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
-              >
-                <History size={18} />
-                <span>Sales Ledger</span>
-              </button>
+                <button
+                  onClick={() => setActiveTab('ledger')}
+                  className={activeTab === 'ledger' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                >
+                  <History size={18} />
+                  <span>Sales Ledger</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('batches')}
-                className={activeTab === 'batches' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
-              >
-                <Layers size={18} />
-                <span>Batches</span>
-              </button>
+                <button
+                  onClick={() => setActiveTab('batches')}
+                  className={activeTab === 'batches' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                >
+                  <Layers size={18} />
+                  <span>Batches</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('staff')}
-                className={activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
-              >
-                <Users size={18} />
-                <span>Staff</span>
-              </button>
-            </>
-          )}
-        </nav>
+                <button
+                  onClick={() => setActiveTab('staff')}
+                  className={activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}
+                >
+                  <Users size={18} />
+                  <span>Staff</span>
+                </button>
+              </>
+            )}
+          </nav>
+        )}
 
         {/* User Profile, Mode Switch, & Logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
