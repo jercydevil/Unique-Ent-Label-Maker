@@ -101,6 +101,17 @@ button, input, select, textarea {
   box-shadow: var(--shadow-md);
 }
 
+/* Responsive Label Generator Grid */
+.label-generator-grid {
+  grid-template-columns: minmax(320px, 420px) 1fr;
+}
+
+@media (max-width: 1024px) {
+  .label-generator-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .glass-card {
   background: rgba(30, 41, 59, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -246,6 +257,96 @@ button, input, select, textarea {
   box-shadow: 0 0 16px #ef4444;
   border-radius: 4px;
   animation: laserSweep 2s ease-in-out infinite;
+}
+
+/* QR Scanner Bracket Overlay Fix - Perfect L-Shaped Corners */
+#qr-shaded-region {
+  border-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+#qr-shaded-region > div {
+  background-color: #fff !important;
+  position: absolute !important;
+}
+
+/* Top-left horizontal bracket */
+#qr-shaded-region > div:nth-child(1) {
+  width: 50px !important;
+  height: 4px !important;
+  top: -2px !important;
+  left: -2px !important;
+  right: auto !important;
+  bottom: auto !important;
+}
+
+/* Top-right horizontal bracket */
+#qr-shaded-region > div:nth-child(2) {
+  width: 50px !important;
+  height: 4px !important;
+  top: -2px !important;
+  right: -2px !important;
+  left: auto !important;
+  bottom: auto !important;
+}
+
+/* Bottom-left horizontal bracket */
+#qr-shaded-region > div:nth-child(3) {
+  width: 50px !important;
+  height: 4px !important;
+  bottom: -2px !important;
+  left: -2px !important;
+  right: auto !important;
+  top: auto !important;
+}
+
+/* Bottom-right horizontal bracket */
+#qr-shaded-region > div:nth-child(4) {
+  width: 50px !important;
+  height: 4px !important;
+  bottom: -2px !important;
+  right: -2px !important;
+  left: auto !important;
+  top: auto !important;
+}
+
+/* Top-left vertical bracket */
+#qr-shaded-region > div:nth-child(5) {
+  width: 4px !important;
+  height: 50px !important;
+  top: -2px !important;
+  left: -2px !important;
+  right: auto !important;
+  bottom: auto !important;
+}
+
+/* Bottom-left vertical bracket */
+#qr-shaded-region > div:nth-child(6) {
+  width: 4px !important;
+  height: 50px !important;
+  bottom: -2px !important;
+  left: -2px !important;
+  right: auto !important;
+  top: auto !important;
+}
+
+/* Top-right vertical bracket */
+#qr-shaded-region > div:nth-child(7) {
+  width: 4px !important;
+  height: 50px !important;
+  top: -2px !important;
+  right: -2px !important;
+  left: auto !important;
+  bottom: auto !important;
+}
+
+/* Bottom-right vertical bracket */
+#qr-shaded-region > div:nth-child(8) {
+  width: 4px !important;
+  height: 50px !important;
+  bottom: -2px !important;
+  right: -2px !important;
+  left: auto !important;
+  top: auto !important;
 }
 
 @keyframes pulseGlow {
