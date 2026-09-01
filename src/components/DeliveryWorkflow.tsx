@@ -28,6 +28,13 @@ import { queueOfflineDelivery } from '../lib/offlineQueue';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
 
+interface CartItem {
+  labelCode: string;
+  labelDetails: LabelDetails;
+  qty: number;
+  error?: string | null;
+}
+
 interface DeliveryWorkflowProps {
   initialCode?: string | null;
   onClearInitialCode?: () => void;
@@ -39,26 +46,22 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
   const { user } = useAuth();
   const { isSandbox, setSandbox } = useMode();
 
-  // Workflow Steps: 'scan' (1) -> 'client_qty' (2 & 3) -> 'success'
-  const [step, setStep] = useState<'scan' | 'form' | 'success'>('scan');
-  const [labelCode, setLabelCode] = useState<string>('');
-  const [labelDetails, setLabelDetails] = useState<LabelDetails | null>(null);
+  // Workflow Steps: 'scan' (add to cart) -> 'checkout' (select client) -> 'success'
+  const [step, setStep] = useState<'scan' | 'checkout' | 'success'>('scan');
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoadingLabel, setIsLoadingLabel] = useState(false);
   const [labelError, setLabelError] = useState<string | null>(null);
 
-  // Client State
+  // Client State (for checkout)
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [clientSearch, setClientSearch] = useState('');
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
 
-  // Quantity State
-  const [qty, setQty] = useState<number>(25);
-
   // Submission & Result
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lastTxResult, setLastTxResult] = useState<{ id?: string; offline?: boolean; code?: string; client?: string; qty?: number } | null>(null);
+  const [lastTxResult, setLastTxResult] = useState<{ id?: string; offline?: boolean; itemCount?: number; client?: string; totalQty?: number } | null>(null);
 
   // Device ID persisted per installation
   const [deviceId] = useState(() => {
@@ -92,7 +95,6 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
 
   const handleCodeScanned = async (code: string) => {
     const clean = code.trim().toLowerCase();
-    setLabelCode(clean);
     setIsLoadingLabel(true);
     setLabelError(null);
 
@@ -100,8 +102,24 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
     setIsLoadingLabel(false);
 
     if (error || !data) {
-      setLabelError(`Label "${clean}" was not found in the database.`);
-      setStep('scan');
+      // Add to cart with error
+      const cartItem: CartItem = {
+        labelCode: clean,
+        labelDetails: {
+          label_code: clean,
+          batch_code: 'UNKNOWN',
+          label_heading: `Invalid Label: ${clean}`,
+          size_mm: 0,
+          color: 'Unknown',
+          qty_per_label: 0,
+          product_type: 'N/A',
+          source_schema: 'unknown'
+        } as any,
+        qty: 0,
+        error: `Label "${clean}" not found in database`
+      };
+      setCart([...cart, cartItem]);
+      setLabelError(null);
       return;
     }
 
@@ -110,19 +128,28 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
       setSandbox(sourceMode);
     }
 
-    setLabelDetails({
+    const labelDetailsFormatted: LabelDetails = {
       ...data,
       qty_per_label: Number(data.qty_per_label) || 25
-    });
-    setQty(Number(data.qty_per_label) || 25);
+    };
 
+    let itemError: string | null = null;
     if (data.status === 'used') {
-      setLabelError('⚠️ ALREADY DELIVERED — This label was already scanned & processed previously!');
+      itemError = '⚠️ ALREADY DELIVERED — This label was already scanned & processed!';
     } else if (data.status !== 'unused') {
-      setLabelError(`⚠️ BLOCKED — This label has status: "${data.status.toUpperCase()}". Delivery cannot be recorded.`);
+      itemError = `⚠️ BLOCKED — Status: "${data.status.toUpperCase()}". Cannot deliver.`;
     }
 
-    setStep('form');
+    // Add item to cart
+    const cartItem: CartItem = {
+      labelCode: clean,
+      labelDetails: labelDetailsFormatted,
+      qty: Number(data.qty_per_label) || 25,
+      error: itemError
+    };
+
+    setCart([...cart, cartItem]);
+    setLabelError(null);
   };
 
   const handleCreateNewClient = () => {
@@ -138,74 +165,99 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
       alert('Please select or enter a client name');
       return;
     }
-    if (qty <= 0) {
-      alert('Quantity must be greater than 0');
+
+    if (cart.length === 0) {
+      alert('Cart is empty');
+      return;
+    }
+
+    // Filter out items with errors
+    const validItems = cart.filter(item => !item.error);
+    if (validItems.length === 0) {
+      alert('Cannot checkout: all items in cart have delivery errors');
       return;
     }
 
     setIsSubmitting(true);
-    const clientTxUuid = crypto.randomUUID();
-    const occurredAt = new Date().toISOString();
+    let successCount = 0;
+    let failureCount = 0;
 
     try {
-      if (!navigator.onLine) {
-        // Enqueue offline delivery
-        await queueOfflineDelivery({
-          client_tx_uuid: clientTxUuid,
-          label_code: labelCode,
-          client_name: selectedClient.trim(),
-          qty,
-          occurred_at: occurredAt,
-          device_id: deviceId,
-          is_sandbox: isSandbox
-        });
+      // Submit each valid item in the cart
+      for (const item of validItems) {
+        const clientTxUuid = crypto.randomUUID();
+        const occurredAt = new Date().toISOString();
 
-        triggerSuccessUI({ offline: true });
-        return;
+        try {
+          if (!navigator.onLine) {
+            // Enqueue offline delivery
+            await queueOfflineDelivery({
+              client_tx_uuid: clientTxUuid,
+              label_code: item.labelCode,
+              client_name: selectedClient.trim(),
+              qty: item.qty,
+              occurred_at: occurredAt,
+              device_id: deviceId,
+              is_sandbox: isSandbox
+            });
+            successCount++;
+            continue;
+          }
+
+          // Online RPC delivery recording
+          const { data, error } = await callRpc(
+            'record_delivery',
+            {
+              p_label_code: item.labelCode,
+              p_client_name: selectedClient.trim(),
+              p_qty: item.qty,
+              p_client_tx_uuid: clientTxUuid,
+              p_occurred_at: occurredAt,
+              p_device_id: deviceId,
+              p_is_sandbox: isSandbox
+            },
+            user?.token
+          );
+
+          if (error) {
+            console.error(`Failed to record ${item.labelCode}:`, error);
+            failureCount++;
+          } else if (data?.result === 'already_processed') {
+            console.warn(`${item.labelCode}: Already processed`);
+            failureCount++;
+          } else if (data?.result === 'blocked') {
+            console.warn(`${item.labelCode}: Blocked (${data.reason})`);
+            failureCount++;
+          } else if (data?.result === 'ok') {
+            successCount++;
+          }
+        } catch (err: any) {
+          console.error(`Exception processing ${item.labelCode}:`, err);
+          // Save offline
+          await queueOfflineDelivery({
+            client_tx_uuid: clientTxUuid,
+            label_code: item.labelCode,
+            client_name: selectedClient.trim(),
+            qty: item.qty,
+            occurred_at: occurredAt,
+            device_id: deviceId,
+            is_sandbox: isSandbox
+          });
+          successCount++;
+        }
       }
 
-      // Online RPC delivery recording
-      const { data, error } = await callRpc(
-        'record_delivery',
-        {
-          p_label_code: labelCode,
-          p_client_name: selectedClient.trim(),
-          p_qty: qty,
-          p_client_tx_uuid: clientTxUuid,
-          p_occurred_at: occurredAt,
-          p_device_id: deviceId,
-          p_is_sandbox: isSandbox
-        },
-        user?.token
-      );
-
-      if (error) {
-        alert(`Could not record delivery: ${error}`);
-      } else if (data?.result === 'already_processed') {
-        alert('⚠️ DUPLICATE BLOCKED: This label was already confirmed delivered!');
-      } else if (data?.result === 'blocked') {
-        alert(`⚠️ Label is blocked (${data.reason})`);
-      } else if (data?.result === 'ok') {
-        triggerSuccessUI({ id: data.transaction_id });
-      }
-    } catch (err: any) {
-      // Network failed mid-request: save offline
-      await queueOfflineDelivery({
-        client_tx_uuid: clientTxUuid,
-        label_code: labelCode,
-        client_name: selectedClient.trim(),
-        qty,
-        occurred_at: occurredAt,
-        device_id: deviceId,
-        is_sandbox: isSandbox
+      triggerSuccessUI({
+        itemCount: successCount,
+        offline: !navigator.onLine,
+        totalQty: validItems.reduce((sum, item) => sum + item.qty, 0)
       });
-      triggerSuccessUI({ offline: true });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const triggerSuccessUI = (info: { id?: string; offline?: boolean }) => {
+  const triggerSuccessUI = (info: { itemCount?: number; offline?: boolean; totalQty?: number }) => {
     // Confetti celebration
     confetti({
       particleCount: 80,
@@ -215,34 +267,28 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
 
     setLastTxResult({
       ...info,
-      code: labelCode,
-      client: selectedClient,
-      qty
+      client: selectedClient
     });
     setStep('success');
   };
 
   const resetForNextScan = () => {
-    setLabelCode('');
-    setLabelDetails(null);
+    setCart([]);
     setLabelError(null);
     setSelectedClient('');
     setClientSearch('');
     setNewClientName('');
     setIsAddingClient(false);
-    setQty(25);
     setStep('scan');
   };
 
-  const filteredClients = clients.filter((c) =>
-    c.name.toLowerCase().includes(clientSearch.toLowerCase())
-  );
+  const removeFromCart = (index: number) => {
+    setCart(cart.filter((_, i) => i !== index));
+  };
 
   return (
     <div style={{ maxWidth: '640px', margin: '0 auto', padding: '20px 16px' }}>
-      {/* -------------------------------------------------------------
-          STEP 1: SCAN QR CODE
-          ------------------------------------------------------------- */}
+      {/* STEP 1: SCAN & BUILD CART */}
       {step === 'scan' && (
         <div style={{ maxWidth: '640px', margin: '0 auto', padding: '0 16px 24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -301,16 +347,16 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
               </nav>
             )}
 
-            <div style={{ textAlign: 'center' }}>
+            <div style={{ textAlign: 'center', marginTop: '12px' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <span className="badge badge-production" style={{ background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)', fontSize: '0.72rem', padding: '5px 10px' }}>
-                  TAP 1 OF 3
+                  ADD TO CART
                 </span>
                 <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 800, letterSpacing: '0.08em' }}>
-                  SCAN PRODUCT LABEL
+                  SCAN PRODUCT LABELS
                 </span>
               </div>
-              <h2 style={{ fontSize: '1.9rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.1, margin: 0 }}>Scan Label to Deliver</h2>
+              <h2 style={{ fontSize: '1.9rem', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.1, margin: 0 }}>Scan Items to Cart</h2>
             </div>
 
             {labelError && (
@@ -331,104 +377,119 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
                 <span>{labelError}</span>
               </div>
             )}
+
+            {/* CART DISPLAY */}
+            {cart.length > 0 && (
+              <div className="glass-panel" style={{ padding: '16px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <PackageCheck size={20} color="#a78bfa" />
+                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a78bfa', letterSpacing: '0.08em' }}>CART ({cart.length} items)</span>
+                </div>
+
+                <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {cart.map((item, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: item.error ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.04)',
+                        border: item.error ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        opacity: item.error ? 0.6 : 1
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', marginBottom: '2px' }}>
+                          {item.labelDetails.label_heading} ({item.labelDetails.size_mm}mm)
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '12px' }}>
+                          <span>{item.labelCode}</span>
+                          <span>{item.qty} pcs</span>
+                        </div>
+                        {item.error && <div style={{ fontSize: '0.7rem', color: '#fca5a5', marginTop: '4px' }}>{item.error}</div>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(idx)}
+                        className="btn-secondary"
+                        style={{ padding: '6px 10px', fontSize: '0.8rem', minWidth: '50px' }}
+                      >
+                        <Minus size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: '14px', display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setStep('checkout')}
+                    className="btn-success"
+                    style={{ flex: 1, padding: '14px' }}
+                    disabled={cart.filter(item => !item.error).length === 0}
+                  >
+                    <ArrowRight size={18} />
+                    <span>Checkout</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Keep scanning - user can stay on this screen
+                    }}
+                    className="btn-primary"
+                    style={{ flex: 1, padding: '14px' }}
+                  >
+                    <Plus size={18} />
+                    <span>Scan More</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* -------------------------------------------------------------
-          STEP 2 & 3: PRODUCT PREVIEW + CLIENT + QTY CONFIRMATION
-          ------------------------------------------------------------- */}
-      {step === 'form' && labelDetails && (
+      {/* STEP 2: CHECKOUT - CLIENT & CONFIRM */}
+      {step === 'checkout' && (
         <div className="glass-panel delivery-form-panel" style={{ padding: '24px' }}>
-          {/* Header Product Card */}
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '24px' }}>Checkout</h2>
+
+          {/* Cart Summary */}
           <div
-            className="delivery-header-card"
             style={{
               background: 'rgba(255, 255, 255, 0.04)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: 'var(--radius-md)',
-              padding: '18px',
-              marginBottom: '20px',
-              position: 'relative',
-              overflow: 'hidden'
+              padding: '16px',
+              marginBottom: '24px'
             }}
           >
-            {/* Color Accent Bar */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                bottom: 0,
-                width: '6px',
-                background: labelDetails.color === 'Golden' ? '#B8860B' : labelDetails.color === 'Green' ? '#16A34A' : labelDetails.color === 'Red' ? '#DC2626' : '#000000'
-              }}
-            />
-
-            <div style={{ paddingLeft: '8px' }}>
-              <div className="delivery-header-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', gap: '10px', flexWrap: 'wrap' }}>
-                <span className="code-tag">{labelDetails.label_code}</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Batch: <strong>{labelDetails.batch_code}</strong>
-                </span>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px' }}>
+              Order Summary
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Items in cart: </span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#a78bfa' }}>{cart.filter(item => !item.error).length}</span>
               </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>
-                {labelDetails.label_heading}
-              </h3>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Size: <strong>{labelDetails.size_mm} MM</strong> • Color: <strong>{labelDetails.color}</strong> • Pack: <strong>{labelDetails.qty_per_label} pcs</strong>
+              <div>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Total quantity: </span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#a78bfa' }}>
+                  {cart.filter(item => !item.error).reduce((sum, item) => sum + item.qty, 0)} pcs
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Warning Banner if already processed */}
-          {labelError && (
-            <div
-              style={{
-                background: 'var(--danger-bg)',
-                border: '1px solid var(--danger)',
-                borderRadius: 'var(--radius-md)',
-                padding: '14px',
-                marginBottom: '20px',
-                color: '#fca5a5',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
-              }}
-            >
-              <AlertOctagon size={24} />
-              <div>
-                <strong>CANNOT DELIVER:</strong> {labelError}
-              </div>
-            </div>
-          )}
-
-          {/* TAP 2: SELECT CLIENT */}
+          {/* CLIENT SELECTION */}
           <div style={{ marginBottom: '22px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '10px', flexWrap: 'wrap' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Tap 2: Select Customer / Store
-              </label>
-              <button
-                type="button"
-                onClick={() => setIsAddingClient(!isAddingClient)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--accent-primary)',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <Plus size={14} />
-                <span>{isAddingClient ? 'Search Existing' : '+ New Customer'}</span>
-              </button>
-            </div>
+            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '12px' }}>
+              Customer / Store Name
+            </label>
 
             {isAddingClient ? (
               <div className="delivery-client-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -457,6 +518,17 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
                 >
                   Set
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingClient(false);
+                    setNewClientName('');
+                  }}
+                  className="btn-secondary"
+                  style={{ padding: '12px 18px' }}
+                >
+                  Back
+                </button>
               </div>
             ) : (
               <div>
@@ -467,7 +539,7 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
                     type="text"
                     value={clientSearch}
                     onChange={(e) => setClientSearch(e.target.value)}
-                    placeholder="Search customer list..."
+                    placeholder="Search or type customer name..."
                     style={{
                       width: '100%',
                       background: 'rgba(255, 255, 255, 0.05)',
@@ -488,7 +560,8 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: '8px',
-                    padding: '4px 0'
+                    padding: '4px 0',
+                    marginBottom: '10px'
                   }}
                 >
                   {filteredClients.map((c) => {
@@ -521,77 +594,69 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
                 </div>
 
                 {selectedClient && (
-                  <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#38bdf8' }}>
-                    Selected Customer: <strong>{selectedClient}</strong>
+                  <div style={{ fontSize: '0.85rem', color: '#38bdf8', marginBottom: '12px' }}>
+                    Selected: <strong>{selectedClient}</strong>
                   </div>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsAddingClient(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--accent-primary)',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Plus size={14} />
+                  <span>+ New Customer</span>
+                </button>
               </div>
             )}
-          </div>
-
-          {/* TAP 3: QUANTITY FIXED FROM LABEL */}
-          <div className="delivery-qty-box" style={{ marginBottom: '26px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-              Tap 3: Quantity from Label
-            </label>
-
-            <div className="delivery-qty-value" style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              background: 'rgba(99, 102, 241, 0.1)',
-              border: '1px solid rgba(99, 102, 241, 0.35)',
-              borderRadius: 'var(--radius-md)',
-              padding: '18px 16px',
-              minHeight: '80px',
-              flexWrap: 'wrap'
-            }}>
-              <span style={{ fontSize: '2.2rem', fontWeight: 800, lineHeight: 1, color: '#fff' }}>
-                {qty}
-              </span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                PCS
-              </span>
-            </div>
-
-            <div style={{ marginTop: '10px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
-              This label is packed as <strong>{qty} PCS</strong> and will be recorded as that quantity.
-            </div>
           </div>
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button
               type="button"
-              disabled={isSubmitting || !!labelError || !selectedClient}
+              disabled={isSubmitting || !selectedClient}
               onClick={handleConfirmDelivery}
               className="btn-success"
               style={{
-                opacity: isSubmitting || !!labelError || !selectedClient ? 0.5 : 1,
-                cursor: isSubmitting || !!labelError || !selectedClient ? 'not-allowed' : 'pointer'
+                opacity: isSubmitting || !selectedClient ? 0.5 : 1,
+                cursor: isSubmitting || !selectedClient ? 'not-allowed' : 'pointer'
               }}
             >
               <PackageCheck size={22} />
-              <span>{isSubmitting ? 'Recording...' : 'Confirm & Record Delivery'}</span>
+              <span>{isSubmitting ? 'Processing...' : 'OK - Confirm & Send to Ledger'}</span>
             </button>
 
             <button
               type="button"
-              onClick={resetForNextScan}
+              onClick={() => {
+                setSelectedClient('');
+                setClientSearch('');
+                setNewClientName('');
+                setIsAddingClient(false);
+                setStep('scan');
+              }}
               className="btn-secondary"
               style={{ width: '100%' }}
             >
               <RotateCcw size={16} />
-              <span>Cancel / Scan Another</span>
+              <span>Back to Cart</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* -------------------------------------------------------------
-          STEP 4: SUCCESS RECEIPT
-          ------------------------------------------------------------- */}
+      {/* STEP 3: SUCCESS RECEIPT */}
       {step === 'success' && lastTxResult && (
         <div
           className="glass-panel"
@@ -619,10 +684,10 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
           </div>
 
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>
-            Delivery Confirmed!
+            Checkout Complete!
           </h2>
           <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '24px' }}>
-            {lastTxResult.offline ? 'Saved to offline queue. Will sync automatically.' : 'Transaction recorded permanently in ledger.'}
+            {lastTxResult.offline ? 'Saved to offline queue. Will sync automatically.' : 'All deliveries recorded in ledger.'}
           </p>
 
           <div
@@ -640,23 +705,17 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Label Code:</span>
-              <span className="code-tag">{lastTxResult.code}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Customer:</span>
               <strong>{lastTxResult.client}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Quantity:</span>
-              <strong>{lastTxResult.qty} PCS</strong>
+              <span style={{ color: 'var(--text-muted)' }}>Items Delivered:</span>
+              <strong>{lastTxResult.itemCount}</strong>
             </div>
-            {lastTxResult.id && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                <span>Tx ID:</span>
-                <span>{lastTxResult.id}</span>
-              </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Total Quantity:</span>
+              <strong>{lastTxResult.totalQty} PCS</strong>
+            </div>
           </div>
 
           <button
@@ -665,7 +724,7 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
             style={{ width: '100%', padding: '16px', fontSize: '1.1rem' }}
           >
             <QrCode size={20} />
-            <span>Scan Next Label</span>
+            <span>Start New Cart</span>
           </button>
         </div>
       )}

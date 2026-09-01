@@ -157,7 +157,7 @@ export const LabelSheetGenerator: React.FC = () => {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) 1fr', gap: '24px', alignItems: 'start' }}>
+      <div className="label-generator-grid" style={{ display: 'grid', gap: '24px', alignItems: 'start' }}>
         {/* Left Column: Configuration Controls */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -168,7 +168,7 @@ export const LabelSheetGenerator: React.FC = () => {
           {/* Product Select */}
           <div style={{ marginBottom: '18px' }}>
             <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
-              1. Select Hardware Product
+              1. Select Lug Caps Items
             </label>
             <select
               value={selectedProductId}
@@ -191,68 +191,10 @@ export const LabelSheetGenerator: React.FC = () => {
             >
               {products.map((p) => (
                 <option key={p.id} value={p.id} style={{ background: '#1e293b', color: '#fff' }}>
-                  {p.label_heading} ({p.size_mm} MM - {p.color})
+                  {p.label_heading} ({p.size_mm} MM - {p.color}) [{p.product_type || 'N/A'}]
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Requirement 8: Product Code Selector */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                2. Product Code (Margin Tracking)
-              </label>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '8px' }}>
-              {['IND', 'CH', 'PD', 'CUSTOM'].map((code) => {
-                const isSelected = productTypeCode === code;
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    onClick={() => setProductTypeCode(code)}
-                    style={{
-                      background: isSelected ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.05)',
-                      color: isSelected ? '#fff' : 'var(--text-secondary)',
-                      border: isSelected ? '1px solid var(--accent-primary)' : '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '8px 4px',
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {code}
-                  </button>
-                );
-              })}
-            </div>
-
-            {productTypeCode === 'CUSTOM' && (
-              <input
-                type="text"
-                value={customTypeCode}
-                onChange={(e) => setCustomTypeCode(e.target.value.toUpperCase())}
-                placeholder="Type custom code (e.g. IND-V2)..."
-                maxLength={12}
-                style={{
-                  width: '100%',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '10px 14px',
-                  color: '#fff',
-                  fontSize: '0.9rem',
-                  fontFamily: 'var(--font-mono)'
-                }}
-              />
-            )}
-
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4, marginTop: '6px' }}>
-              ℹ️ <strong>Operator Note:</strong> Code <strong>[{effectiveProductTypeCode}]</strong> will be printed on the A4 sheet margin header for identification, but hidden from the customer label.
-            </div>
           </div>
 
           {/* Quantity Per Label */}
