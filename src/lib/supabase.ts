@@ -7,12 +7,12 @@ const demoLoginEnabled = import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 const demoStaffCode = (import.meta.env.VITE_DEMO_STAFF_CODE || '').trim().toLowerCase();
 const demoPin = (import.meta.env.VITE_DEMO_PIN || '').trim();
 
-const isLocalhost = typeof window !== 'undefined'
-  ? ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
-  : false;
+const DEFAULT_SUPABASE_URL = 'https://foqcklcveratblxbhxvd.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_dJTRfnx8Y-RUQGWnN_asRQ_ScRvkatA';
 
-export const SUPABASE_URL = (envSupabaseUrl || (isLocalhost ? 'http://127.0.0.1:54321' : '')).replace(/\/$/, '');
-export const SUPABASE_ANON_KEY = envSupabaseAnonKey || '';
+export const SUPABASE_URL = (envSupabaseUrl || DEFAULT_SUPABASE_URL).replace(/\/$/, '');
+export const SUPABASE_ANON_KEY = envSupabaseAnonKey || DEFAULT_SUPABASE_ANON_KEY;
+
 
 export interface UserSession {
   id: string;             // auth_user_id
