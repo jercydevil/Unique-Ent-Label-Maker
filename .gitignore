@@ -1,1 +1,13 @@
 node_modules
+.vercel
+dist
+.env*
+.env.local
+supabase/.temp/
+supabase/.branches/
+*.pdf
+extract_pdf_text.py
+generate-demo-sheet.mjs
+generated-demo-sheet.pdf
+
+

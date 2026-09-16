@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 
 export const PinLogin: React.FC = () => {
   const { login, isLoading } = useAuth();
-  const [staffCode, setStaffCode] = useState(() => localStorage.getItem('unique_ent_last_staff') || '');
+  const [staffCode, setStaffCode] = useState(() => sessionStorage.getItem('unique_ent_last_staff') || '');
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState(false);
@@ -49,19 +49,13 @@ export const PinLogin: React.FC = () => {
       triggerShake();
       setPin('');
     } else {
-      localStorage.setItem('unique_ent_last_staff', staffCode.trim().toLowerCase());
+      sessionStorage.setItem('unique_ent_last_staff', staffCode.trim().toLowerCase());
     }
   };
 
   const triggerShake = () => {
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 500);
-  };
-
-  const quickFillAdmin = () => {
-    setStaffCode('admin1');
-    setPin('1234');
-    setErrorMsg(null);
   };
 
   return (

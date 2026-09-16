@@ -1,0 +1,41 @@
+{
+  "name": "Unique Enterprise — QR Sales Register & Label Maker",
+  "short_name": "UE Register",
+  "description": "High-Speed QR Delivery Register & Precision Label Sheet Generator for Unique Enterprise",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0f1d",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Scan & Deliver",
+      "short_name": "Scan",
+      "description": "Open QR Scanner for fast delivery registration",
+      "url": "/?tab=scan",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Print Labels",
+      "short_name": "Labels",
+      "description": "Generate A4 Landscape label sheets",
+      "url": "/?tab=labels",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

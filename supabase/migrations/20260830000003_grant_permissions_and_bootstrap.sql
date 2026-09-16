@@ -23,7 +23,9 @@ alter default privileges in schema sandbox grant all on tables to postgres, serv
 alter default privileges in schema sandbox grant all on sequences to postgres, service_role, authenticated, anon;
 alter default privileges in schema sandbox grant all on routines to postgres, service_role, authenticated, anon;
 
--- Bootstrap the initial admin staff row
+-- Bootstrap the initial admin staff row only if the matching auth user exists.
+-- This keeps local Supabase startup working on a fresh database, where the
+-- auth user must be created manually before the staff row can reference it.
 insert into core.staff (
   auth_user_id,
   staff_code,
@@ -31,13 +33,16 @@ insert into core.staff (
   role,
   pin_hash,
   active
-) values (
-  'b225514c-3fca-4e74-9708-6efcbcb1c3b6',
+)
+select
+  'b225514c-3fca-4e74-9708-6efcbcb1c3b6'::uuid,
   'admin1',
   'Admin',
   'admin',
   extensions.crypt('1234', extensions.gen_salt('bf', 10)),
   true
+where exists (
+  select 1 from auth.users where id = 'b225514c-3fca-4e74-9708-6efcbcb1c3b6'::uuid
 )
 on conflict (staff_code) do update
 set auth_user_id = excluded.auth_user_id,

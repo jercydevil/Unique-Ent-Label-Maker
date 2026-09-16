@@ -1,8 +1,7 @@
 // src/lib/pdfGenerator.ts
 // Precision 3x4 A4 Landscape vector PDF generator matching the exact ink-saving template
 
-import { jsPDF } from 'jspdf';
-import QRCode from 'qrcode';
+import type { jsPDF } from 'jspdf';
 import type { Label, Product } from './supabase';
 
 export interface GenerateSheetOptions {
@@ -16,8 +15,10 @@ export interface GenerateSheetOptions {
 export async function generateLabelPdf(options: GenerateSheetOptions): Promise<jsPDF> {
   const { product, productTypeDisplay, batchCode, qtyPerLabel, labels } = options;
 
+  const { jsPDF: JsPdfClass } = await import('jspdf');
+
   // A4 Landscape dimensions in mm
-  const doc = new jsPDF({
+  const doc = new JsPdfClass({
     orientation: 'landscape',
     unit: 'mm',
     format: 'a4'
@@ -26,21 +27,24 @@ export async function generateLabelPdf(options: GenerateSheetOptions): Promise<j
   const PAGE_WIDTH = 297;
   const PAGE_HEIGHT = 210;
 
-  // Grid configuration: 3 columns x 4 rows = 12 labels per sheet
-  const COLS = 3;
-  const ROWS = 4;
+  // Dense A4 landscape layout for a 2 x 1.5 inch label target.
+  const COLS = 5;
+  const ROWS = 5;
   const LABELS_PER_PAGE = COLS * ROWS;
 
-  // Top header space for sheet indicators
-  const TOP_MARGIN = 12;
-  const BOTTOM_MARGIN = 6;
+  // Recommended best-fit layout with no extra wasted space.
+  const TOP_MARGIN = 10;
+  const BOTTOM_MARGIN = 4;
   const SIDE_MARGIN = 6;
+  const CELL_GAP_X = 0.2;
+  const CELL_GAP_Y = 0.2;
 
-  const GRID_WIDTH = PAGE_WIDTH - (SIDE_MARGIN * 2); // 285mm
-  const GRID_HEIGHT = PAGE_HEIGHT - TOP_MARGIN - BOTTOM_MARGIN; // 192mm
+  // Keep the 6×3 layout compact enough to fit 18 labels on one A4 landscape sheet.
+  const GRID_WIDTH = PAGE_WIDTH - (SIDE_MARGIN * 2) - (CELL_GAP_X * (COLS - 1));
+  const GRID_HEIGHT = PAGE_HEIGHT - TOP_MARGIN - BOTTOM_MARGIN - (CELL_GAP_Y * (ROWS - 1));
 
-  const LABEL_WIDTH = GRID_WIDTH / COLS; // 95mm (~3.74" or 3.0" printable)
-  const LABEL_HEIGHT = GRID_HEIGHT / ROWS; // 48mm (~1.89" or 2.0" printable)
+  const LABEL_WIDTH = GRID_WIDTH / COLS;
+  const LABEL_HEIGHT = GRID_HEIGHT / ROWS;
 
   const totalPages = Math.ceil(labels.length / LABELS_PER_PAGE);
 
@@ -52,17 +56,17 @@ export async function generateLabelPdf(options: GenerateSheetOptions): Promise<j
     // -------------------------------------------------------------
     // Exact Top Sheet Margin Header matching template
     // -------------------------------------------------------------
-    // Left: LABEL SIZE: 3.0" x 2.0" (in red)
+    // Left: Actual label size (in red)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(220, 38, 38); // Red
-    doc.text('LABEL SIZE: 3.0" x 2.0"', SIDE_MARGIN + 2, 7.5);
+    doc.text(`LABEL SIZE: ${product.size_mm} MM`, SIDE_MARGIN + 2, 7.5);
 
-    // Center: 12 LABELS PER A4 (LANDSCAPE) - BORDERLESS
+    // Center: 25 LABELS PER A4 (LANDSCAPE) - BORDERLESS
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(15, 23, 42); // Black
-    let centerHeader = '12 LABELS PER A4 (LANDSCAPE) - BORDERLESS';
+    let centerHeader = '25 LABELS PER A4 (LANDSCAPE) - BORDERLESS';
     if (productTypeDisplay) {
       centerHeader += `  •  TYPE: [ ${productTypeDisplay.toUpperCase()} ]`;
     }
@@ -84,14 +88,14 @@ export async function generateLabelPdf(options: GenerateSheetOptions): Promise<j
 
     // Vertical cutting lines
     for (let c = 0; c <= COLS; c++) {
-      const x = SIDE_MARGIN + c * LABEL_WIDTH;
-      doc.line(x, TOP_MARGIN, x, TOP_MARGIN + GRID_HEIGHT);
+      const x = SIDE_MARGIN + c * (LABEL_WIDTH + CELL_GAP_X);
+      doc.line(x, TOP_MARGIN, x, TOP_MARGIN + GRID_HEIGHT + (ROWS - 1) * CELL_GAP_Y);
     }
 
     // Horizontal cutting lines
     for (let r = 0; r <= ROWS; r++) {
-      const y = TOP_MARGIN + r * LABEL_HEIGHT;
-      doc.line(SIDE_MARGIN, y, SIDE_MARGIN + GRID_WIDTH, y);
+      const y = TOP_MARGIN + r * (LABEL_HEIGHT + CELL_GAP_Y);
+      doc.line(SIDE_MARGIN, y, SIDE_MARGIN + GRID_WIDTH + (COLS - 1) * CELL_GAP_X, y);
     }
 
     // Reset line dash to solid
@@ -106,8 +110,8 @@ export async function generateLabelPdf(options: GenerateSheetOptions): Promise<j
       const col = i % COLS;
       const row = Math.floor(i / COLS);
 
-      const x = SIDE_MARGIN + col * LABEL_WIDTH;
-      const y = TOP_MARGIN + row * LABEL_HEIGHT;
+      const x = SIDE_MARGIN + col * (LABEL_WIDTH + CELL_GAP_X);
+      const y = TOP_MARGIN + row * (LABEL_HEIGHT + CELL_GAP_Y);
 
       await renderTemplateLabel(doc, {
         x,
@@ -139,84 +143,76 @@ interface TemplateLabelParams {
 async function renderTemplateLabel(doc: jsPDF, params: TemplateLabelParams) {
   const { x, y, width, height, product, label, batchCode, qtyPerLabel } = params;
 
-  // Padding inside label cell
-  const padLeft = x + 5;
-  const padTop = y + 7;
+  const inset = 1;
+  const padLeft = x + inset;
+  const padTop = y + 1;
 
-  // -------------------------------------------------------------
-  // 1. Heading: Size in Black + Color in Specific Color
-  // e.g. "30 MM " in Black, "RED" in Red
-  // -------------------------------------------------------------
+  // Recommended best-fit compact label geometry with cleaner proportions.
+  const qrBoxWidth = 19.5;
+  const qrSize = 16;
+  const textBlockWidth = width - (inset * 2) - qrBoxWidth - 0.9;
+
+  const headingFontSize = 15;
+  const bodyFontSize = 12;
+  const detailFontSize = 7.5;
+
   const sizeText = `${product.size_mm} MM `;
   const colorText = (product.color || '').toUpperCase();
 
-  // Extract RGB for color
   const hex = product.label_color_hex || (colorText === 'RED' ? '#DC2626' : colorText === 'GREEN' ? '#16A34A' : colorText === 'GOLDEN' ? '#B8860B' : '#000000');
   const colorR = parseInt(hex.slice(1, 3), 16) || 0;
   const colorG = parseInt(hex.slice(3, 5), 16) || 0;
   const colorB = parseInt(hex.slice(5, 7), 16) || 0;
 
-  // Draw Size Part (Black, Extra Bold)
+  const headingY = padTop + 3.2;
+  const lineY = headingY + 3.0;
+  const qtyY = lineY + 5.5;
+  const batchY = qtyY + 5.4;
+  const idY = batchY + 5.1;
+
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(0, 0, 0); // Black
-  doc.text(sizeText, padLeft, padTop + 4.5);
+  doc.setFontSize(headingFontSize);
+  doc.setTextColor(0, 0, 0);
+  doc.text(sizeText, padLeft, headingY);
 
   const sizeTextWidth = doc.getTextWidth(sizeText);
-
-  // Draw Color Part (Specific Color, Extra Bold)
   doc.setTextColor(colorR, colorG, colorB);
-  doc.text(colorText, padLeft + sizeTextWidth, padTop + 4.5);
+  doc.text(colorText, padLeft + sizeTextWidth, headingY);
 
-  const fullHeadingWidth = sizeTextWidth + doc.getTextWidth(colorText);
+  const fullHeadingWidth = Math.min(textBlockWidth, sizeTextWidth + doc.getTextWidth(colorText));
 
-  // -------------------------------------------------------------
-  // 2. Horizontal Color Accent Line under Heading
-  // -------------------------------------------------------------
-  const lineY = padTop + 7.5;
   doc.setDrawColor(colorR, colorG, colorB);
-  doc.setLineWidth(0.6);
-  doc.line(padLeft, lineY, padLeft + Math.max(fullHeadingWidth, 48), lineY);
+  doc.setLineWidth(0.5);
+  doc.line(padLeft, lineY, padLeft + fullHeadingWidth + 1, lineY);
 
-  // -------------------------------------------------------------
-  // 3. Details (QTY, BATCH, ID)
-  // -------------------------------------------------------------
-  // QTY : 500 PCS (Bold Black)
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12.5);
+  doc.setFontSize(bodyFontSize);
   doc.setTextColor(0, 0, 0);
-  doc.text(`QTY :  ${qtyPerLabel}  PCS`, padLeft, lineY + 9);
+  doc.text(`QTY: ${qtyPerLabel} PCS`, padLeft, qtyY);
 
-  // BATCH : B260829-01
-  const batchY = lineY + 16.5;
-  drawCalendarIcon(doc, padLeft, batchY - 3.2);
+  const detailX = padLeft + 4.2;
+  const batchText = `BATCH: ${batchCode}`;
+  const idText = `ID: ${label.label_code}`;
 
+  drawCalendarIcon(doc, padLeft, batchY - 3.3);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(detailFontSize);
   doc.setTextColor(30, 30, 30);
-  doc.text(`BATCH :  ${batchCode}`, padLeft + 5.5, batchY);
+  doc.text(batchText, detailX, batchY);
 
-  // ID : UE-000191 / label_code
-  const idY = batchY + 6.5;
-  drawTagIcon(doc, padLeft, idY - 3.2);
-
+  drawTagIcon(doc, padLeft, idY - 3.3);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(detailFontSize);
   doc.setTextColor(30, 30, 30);
-  doc.text(`ID :  ${label.label_code}`, padLeft + 5.5, idY);
+  doc.text(idText, detailX, idY);
 
-  // -------------------------------------------------------------
-  // 4. Right Side: Vector QR Code with Rounded Border Frame
-  // -------------------------------------------------------------
-  const qrSize = 30; // 30mm x 30mm
-  const qrX = x + width - qrSize - 5;
-  const qrY = y + (height - qrSize) / 2;
+  const qrX = x + width - qrBoxWidth - inset + 0.3;
+  const qrY = y + height - qrSize - 1 - 0.8;
 
-  // Generate QR Data URL
-  const qrUrl = `https://broken-frost-10eb.jercydevil.workers.dev/s/${label.label_code}`;
-  const qrDataUrl = await QRCode.toDataURL(qrUrl, {
+  const { default: QRCode } = await import('qrcode');
+  const qrDataUrl = await QRCode.toDataURL(label.label_code, {
     margin: 0,
-    width: 250,
+    width: 240,
     errorCorrectionLevel: 'M',
     color: {
       dark: '#000000',
@@ -224,14 +220,7 @@ async function renderTemplateLabel(doc: jsPDF, params: TemplateLabelParams) {
     }
   });
 
-  // QR Outer Box (Rounded, Thin Black Border with white background)
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.4);
-  doc.roundedRect(qrX - 1.5, qrY - 1.5, qrSize + 3, qrSize + 3, 2, 2, 'FD');
-
-  // Insert QR Code image inside frame
-  doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+  doc.addImage(qrDataUrl, 'PNG', qrX + 0.4, qrY + 0.4, qrSize, qrSize);
 }
 
 // Helper: Vector Calendar Icon

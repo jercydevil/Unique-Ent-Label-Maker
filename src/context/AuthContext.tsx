@@ -16,28 +16,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'unique_ent_auth_session';
 
+const readStoredSession = (): UserSession | null => {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+
+    const session: UserSession = JSON.parse(stored);
+    if (session.expires_at && session.expires_at > Math.floor(Date.now() / 1000)) {
+      return session;
+    }
+
+    sessionStorage.removeItem(STORAGE_KEY);
+    return null;
+  } catch {
+    sessionStorage.removeItem(STORAGE_KEY);
+    return null;
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const session: UserSession = JSON.parse(stored);
-        // Check if token is expired
-        if (session.expires_at && session.expires_at > Math.floor(Date.now() / 1000)) {
-          setUser(session);
-        } else {
-          localStorage.removeItem(STORAGE_KEY);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to parse stored session', e);
-      localStorage.removeItem(STORAGE_KEY);
-    } finally {
-      setIsLoading(false);
-    }
+    const storedSession = readStoredSession();
+    setUser(storedSession);
+    setIsLoading(false);
   }, []);
 
   const login = async (staffCode: string, pin: string) => {
@@ -50,13 +54,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setUser(session);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     return { success: true };
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
   };
 
   return (

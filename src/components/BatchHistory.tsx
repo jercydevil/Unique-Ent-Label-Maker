@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Layers, Download, RefreshCw, Printer, CheckCircle2, Clock } from 'lucide-react';
-import { callRpc, type Batch, type Label, type Product } from '../lib/supabase';
+import { callRpc, subscribeToRealtimeTable, type Batch, type Label, type Product } from '../lib/supabase';
 import { generateLabelPdf } from '../lib/pdfGenerator';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
@@ -16,6 +16,7 @@ export const BatchHistory: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [printingBatchId, setPrintingBatchId] = useState<string | null>(null);
+  const [realtimeActive, setRealtimeActive] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -36,6 +37,42 @@ export const BatchHistory: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [isSandbox, user?.token]);
+
+  // Realtime Live Subscription for Batches & Deliveries
+  useEffect(() => {
+    const activeSchema = isSandbox ? 'sandbox' : 'core';
+    
+    // Subscribe to batch creation/updates
+    const unsubscribeBatches = subscribeToRealtimeTable({
+      schema: activeSchema,
+      table: 'batches',
+      event: '*',
+      token: user?.token,
+      onStatusChange: (status) => {
+        setRealtimeActive(status === 'SUBSCRIBED');
+      },
+      onPayload: () => {
+        loadData();
+      }
+    });
+
+    // Also reload when delivery transactions occur to refresh live consumption rates
+    const unsubscribeTx = subscribeToRealtimeTable({
+      schema: activeSchema,
+      table: 'transactions',
+      event: '*',
+      token: user?.token,
+      onPayload: () => {
+        loadData();
+      }
+    });
+
+    return () => {
+      unsubscribeBatches();
+      unsubscribeTx();
+    };
+  }, [isSandbox, user?.token]);
+
 
   const handleReprintPdf = async (batch: Batch) => {
     setPrintingBatchId(batch.id);
@@ -88,10 +125,38 @@ export const BatchHistory: React.FC = () => {
           </p>
         </div>
 
-        <button onClick={loadData} className="btn-secondary" style={{ padding: '8px 16px' }}>
-          <RefreshCw size={16} />
-          <span>Refresh</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              background: realtimeActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+              border: realtimeActive ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+              color: realtimeActive ? '#34d399' : 'var(--text-muted)'
+            }}
+          >
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: realtimeActive ? '#10b981' : '#94a3b8',
+                boxShadow: realtimeActive ? '0 0 8px #10b981' : 'none'
+              }}
+            />
+            <span>{realtimeActive ? 'Realtime Live' : 'Connecting...'}</span>
+          </div>
+
+          <button onClick={loadData} className="btn-secondary" style={{ padding: '8px 16px' }}>
+            <RefreshCw size={16} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>

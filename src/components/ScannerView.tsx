@@ -2,7 +2,6 @@
 // High-performance camera QR scanner with laser viewfinder and manual code entry fallback
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, ArrowRight, AlertTriangle } from 'lucide-react';
 
 interface ScannerViewProps {
@@ -17,8 +16,35 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
 
-  const qrReaderRef = useRef<Html5Qrcode | null>(null);
+  const qrReaderRef = useRef<any>(null);
   const scannerContainerId = 'qr-reader-container';
+  const lastDecodedRef = useRef<string>('');
+
+  const playScanBeep = () => {
+    try {
+      const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtor) return;
+
+      const audioCtx = new AudioCtor();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.type = 'triangle';
+      oscillator.frequency.setValueAtTime(1800, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.09, audioCtx.currentTime + 0.015);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.14);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.15);
+
+      setTimeout(() => audioCtx.close(), 180);
+    } catch (error) {
+      // Audio not supported in some browsers; fail silently.
+    }
+  };
 
   const extractLabelCode = (scannedText: string): string => {
     // If QR is full URL: https://<domain>/s/<8-char-code>
@@ -31,7 +57,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
     if (/^[a-z0-9]{8}$/.test(clean)) {
       return clean;
     }
-    return clean;
+    return 'Null';
   };
 
   useEffect(() => {
@@ -39,16 +65,24 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
 
     const startScanner = async () => {
       try {
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
         const html5QrCode = new Html5Qrcode(scannerContainerId, {
           formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
           verbose: false
         });
         qrReaderRef.current = html5QrCode;
 
+        const viewFinderWidth = Math.min(window.innerWidth - 36, 300);
+        const viewFinderHeight = Math.min(window.innerHeight * 0.32, 240);
+
         const config = {
-          fps: 15,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0
+          fps: 12,
+          qrbox: {
+            width: viewFinderWidth,
+            height: viewFinderHeight
+          },
+          aspectRatio: 1.0,
+          disableFlip: false
         };
 
         await html5QrCode.start(
@@ -57,9 +91,11 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
           (decodedText) => {
             if (!mounted) return;
             const code = extractLabelCode(decodedText);
-            // Play subtle haptic / audio feedback
-            if (navigator.vibrate) navigator.vibrate(80);
-            stopScanner().then(() => onScanSuccess(code));
+            if (!code || code === lastDecodedRef.current) return;
+            lastDecodedRef.current = code;
+            if (navigator.vibrate) navigator.vibrate(50);
+            playScanBeep();
+            onScanSuccess(code);
           },
           () => {
             // Frame scan failure (expected during search)
@@ -172,7 +208,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
         id={scannerContainerId}
         style={{
           width: '100%',
-          height: '220px',
+          height: '280px',
+          maxHeight: '42vh',
+          minHeight: '220px',
           background: '#000',
           position: 'relative',
           border: '2px solid rgba(99, 102, 241, 0.7)',
@@ -190,9 +228,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ onScanSuccess, onCance
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '72%',
-            maxWidth: '320px',
-            height: '180px',
+            width: '76%',
+            maxWidth: '330px',
+            height: '210px',
             pointerEvents: 'none',
             border: '2px solid rgba(99, 102, 241, 0.9)',
             borderRadius: '14px',

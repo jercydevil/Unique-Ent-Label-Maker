@@ -1,3 +1,8 @@
 {
-    "markdown.validate.enabled": true
+    "markdown.validate.enabled": true,
+    "kimi.editorContext": "onConversationStart",
+    "kimi.autosave": true,
+    "kimi.showThinkingContent": true,
+    "kimi.showThinkingExpanded": false,
+    "kimi.enableNewConversationShortcut": true
 }

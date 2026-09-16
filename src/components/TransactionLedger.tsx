@@ -16,9 +16,11 @@ import {
   FileSpreadsheet,
   AlertTriangle,
   CheckCircle2,
-  X
+  X,
+  Radio,
+  RefreshCw
 } from 'lucide-react';
-import { callRpc, type Transaction } from '../lib/supabase';
+import { callRpc, subscribeToRealtimeTable, type Transaction } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
 
@@ -30,6 +32,8 @@ export const TransactionLedger: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'voided'>('all');
+  const [realtimeActive, setRealtimeActive] = useState(false);
+  const [newlyAddedId, setNewlyAddedId] = useState<string | null>(null);
 
   // Modals
   const [selectedTxForVoid, setSelectedTxForVoid] = useState<Transaction | null>(null);
@@ -57,6 +61,35 @@ export const TransactionLedger: React.FC = () => {
   useEffect(() => {
     loadTransactions();
   }, [isSandbox, user?.token]);
+
+  // Realtime Live Subscription
+  useEffect(() => {
+    const activeSchema = isSandbox ? 'sandbox' : 'core';
+    const unsubscribe = subscribeToRealtimeTable({
+      schema: activeSchema,
+      table: 'transactions',
+      event: '*',
+      token: user?.token,
+      onStatusChange: (status) => {
+        setRealtimeActive(status === 'SUBSCRIBED');
+      },
+      onPayload: (payload) => {
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const newRow = payload.new;
+          setNewlyAddedId(newRow.id);
+          setTimeout(() => setNewlyAddedId(null), 3000);
+          loadTransactions();
+        } else if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+          loadTransactions();
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isSandbox, user?.token]);
+
 
   // Execute Void Action
   const handleConfirmVoid = async () => {
@@ -143,13 +176,42 @@ export const TransactionLedger: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={loadTransactions}
-          className="btn-secondary"
-          style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-        >
-          Refresh Data
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              background: realtimeActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+              border: realtimeActive ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+              color: realtimeActive ? '#34d399' : 'var(--text-muted)'
+            }}
+          >
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: realtimeActive ? '#10b981' : '#94a3b8',
+                boxShadow: realtimeActive ? '0 0 8px #10b981' : 'none'
+              }}
+            />
+            <span>{realtimeActive ? 'Realtime Live' : 'Connecting...'}</span>
+          </div>
+
+          <button
+            onClick={loadTransactions}
+            className="btn-secondary"
+            style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+          >
+            <RefreshCw size={15} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -277,9 +339,11 @@ export const TransactionLedger: React.FC = () => {
                   return (
                     <tr
                       key={tx.id}
+                      className={newlyAddedId === tx.id ? 'row-pulse-highlight' : ''}
                       style={{
                         borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                        opacity: tx.status === 'voided' ? 0.6 : 1
+                        opacity: tx.status === 'voided' ? 0.6 : 1,
+                        transition: 'background-color 0.4s ease'
                       }}
                     >
                       <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>

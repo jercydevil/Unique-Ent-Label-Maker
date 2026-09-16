@@ -81,6 +81,12 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
     }
   };
 
+  const filteredClients = clients.filter((client) => {
+    const term = clientSearch.trim().toLowerCase();
+    if (!term) return true;
+    return client.name.toLowerCase().includes(term);
+  });
+
   useEffect(() => {
     loadClients();
   }, [isSandbox, user?.token]);
@@ -94,6 +100,11 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
   }, [initialCode]);
 
   const handleCodeScanned = async (code: string) => {
+    if (!/^[a-z0-9]{8}$/i.test(code.trim())) {
+      setLabelError('Null');
+      return;
+    }
+
     const clean = code.trim().toLowerCase();
     setIsLoadingLabel(true);
     setLabelError(null);
@@ -118,7 +129,7 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
         qty: 0,
         error: `Label "${clean}" not found in database`
       };
-      setCart([...cart, cartItem]);
+      setCart((prev) => [...prev, cartItem]);
       setLabelError(null);
       return;
     }
@@ -148,7 +159,7 @@ export const DeliveryWorkflow: React.FC<DeliveryWorkflowProps> = ({ initialCode,
       error: itemError
     };
 
-    setCart([...cart, cartItem]);
+    setCart((prev) => [...prev, cartItem]);
     setLabelError(null);
   };
 
